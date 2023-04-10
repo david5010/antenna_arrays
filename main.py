@@ -57,8 +57,8 @@ def cross_validate(fold, model, optimizer, criterion, epochs, data, device):
     testing_avg_loss = []
     for k, (train, test) in enumerate(kf.split(np.arange(len(data)))):
         print(f'{k}-Fold')
-        train_loader = DataLoader(AntDataset(data[[i for i in train]]))
-        test_loader = DataLoader(AntDataset(data[[i for i in test]]))
+        train_loader = DataLoader(AntDataset(data[train]))
+        test_loader = DataLoader(AntDataset(data[test]))
         model = model.to(device)
         train_loss, test_loss = train_and_evaluate(model, optimizer, criterion, train_loader, test_loader, epochs, device)
         training_avg_loss.append(np.mean(train_loss))
