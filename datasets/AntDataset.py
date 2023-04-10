@@ -5,11 +5,13 @@ import torch
 import os
 
 class AntDataset(Dataset):
-    def __init__(self, csv_file):
-        if os.path.splitext(csv_file)[-1] == '.csv':
-            self.data = pd.read_csv(csv_file, header = None).values.astype(np.float32)
+    def __init__(self, data):
+        if data is not str:
+            self.data = data.astype(np.float32)
+        elif os.path.splitext(data)[-1] == '.csv':
+            self.data = pd.read_csv(data, header = None).values.astype(np.float32)
         else:
-            self.data = np.load(csv_file)['data'].astype(np.float32)
+            self.data = np.load(data)['data'].astype(np.float32)
             
     def __len__(self):
         return len(self.data)
@@ -20,11 +22,11 @@ class AntDataset(Dataset):
         return torch.from_numpy(features), torch.from_numpy(np.array(label))
     
 class AntDataset2D(Dataset):
-    def __init__(self, csv_file):
-        if os.path.splitext(csv_file)[-1] == '.csv':
-            self.data = pd.read_csv(csv_file, header= None).values.astype(np.float32)
+    def __init__(self, data):
+        if os.path.splitext(data)[-1] == '.csv':
+            self.data = pd.read_csv(data, header= None).values.astype(np.float32)
         else:
-            self.data = np.load(csv_file)['data'].astype(np.float32)
+            self.data = np.load(data)['data'].astype(np.float32)
         
     def __len__(self):
         return len(self.data)

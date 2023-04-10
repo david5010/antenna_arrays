@@ -5,6 +5,7 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 import torch.optim as optim
 from models.transformers import TransformerRegressor
+from sklearn.model_selection import KFold
 
 def train(model, optimizer, criterion, train_loader, device):
     model.train()
@@ -50,8 +51,19 @@ def train_and_evaluate(model, optimizer, criterion, train_loader, test_loader, n
         print(f"Epoch {epoch+1} - Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}")
     return train_losses, test_losses
 
-def kfold():
-    pass
+def cross_validate(fold, model, optimizer, criterion, epochs, data, device):
+    kf = KFold(n_splits = fold)
+    training_avg_loss = []
+    testing_avg_loss = []
+    for k, (train, test) in enumerate(kf.split(np.arange(len(data)))):
+        print(f'{k}-Fold')
+        train_loader = DataLoader(AntDataset(data[[i for i in train]]))
+        test_loader = DataLoader(AntDataset(data[[i for i in test]]))
+        model = model.to(device)
+        train_loss, test_loss = train_and_evaluate(model, optimizer, criterion, train_loader, test_loader, epochs, device)
+        training_avg_loss.append(np.mean(train_loss))
+        testing_avg_loss.append(np.mean(test_loss))
+    return np.mean(training_avg_loss), np.mean(testing_avg_loss)
 
 if __name__ == '__main__':
 
