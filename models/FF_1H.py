@@ -7,12 +7,29 @@ class SimpleNN(nn.Module):
     # in the future, implement one with configuration files for ease
     def __init__(self, input_size, output_size, hidden_size , act_func) -> None:
         super(SimpleNN, self).__init__()
+        self.name = 'FF'
         self.regressor = nn.Sequential(
             nn.Linear(input_size, hidden_size),
             act_func(),
             nn.Linear(hidden_size, output_size)
         )
         
+    def forward(self, x):
+        return self.regressor(x)
+
+class NN2(nn.Module):
+    # Two-layers
+    def __init__(self, input_size, output_size, hid1_size, hid2_size, act_func) -> None:
+        super(NN2, self).__init__()
+        self.name = 'FF'
+        self.regressor = nn.Sequential(
+            nn.Linear(input_size, hid1_size),
+            act_func(),
+            nn.Linear(hid1_size, hid2_size),
+            act_func(),
+            nn.Linear(hid2_size, output_size)
+        )
+
     def forward(self, x):
         return self.regressor(x)
     

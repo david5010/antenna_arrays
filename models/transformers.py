@@ -1,44 +1,101 @@
 import torch
 import torch.nn as nn
-import math
-
-
-class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, max_len=5000):
-        super(PositionalEncoding, self).__init__()
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0).transpose(0, 1)
-        self.register_buffer('pe', pe)
-
-    def forward(self, x):
-        x = x + self.pe[:x.size(0), :]
-        return x
 
 class TransformerRegressor(nn.Module):
-    def __init__(self, input_dim, nhead, nhid, nlayers, dropout=0.5):
-        super(TransformerRegressor, self).__init__()
-        self.embedding = nn.Linear(input_dim, input_dim)
-        self.pos_encoder = PositionalEncoding(input_dim)
-        self.transformer = nn.Transformer(
-            input_dim, nhead, nlayers, nhid, dropout=dropout
-        )
-        self.decoder = nn.Linear(input_dim, 1)
+    def __init__(self, d_model,
+                nhead, num_encoder_layers,
+                num_decoder_layers,
+                dim_feedforward,
+                dropout,
+                input_dim=2,
+                batch_first=True) -> None:
+        super().__init__()
 
-    def forward(self, x):
-        x = self.embedding(x)
-        x = self.pos_encoder(x)
-        x = self.transformer(x.unsqueeze(1)).squeeze(1)
-        x = self.decoder(x)
-        return x.squeeze(-1)
+        self.name = 'Transformer'
 
-input_dim = 2048
-nhead = 8
-nhid = 256
-nlayers = 3
-dropout = 0.1
+        # Linear layer to project input to d_model
+        self.input_proj = nn.Linear(input_dim, d_model)
+        self.target_proj = nn.Linear(1, d_model)
+        # base of the transformer
+        self.transformer = nn.Transformer(d_model, nhead,
+                                          num_encoder_layers,
+                                          num_decoder_layers,
+                                          dim_feedforward,
+                                          dropout,
+                                          batch_first=batch_first)
+        # output layer to 1
+        self.fc = nn.Linear(d_model, 1)
 
-model = TransformerRegressor(input_dim, nhead, nhid, nlayers, dropout)
+    def forward(self, src, tgt):
+        # Project input to d_model
+        # src = self.input_proj(src)
+        # # Generate masks
+        tgt = tgt.reshape(-1,1)
+        # src = self.input_proj(src)
+        tgt = self.target_proj(tgt)
+        src_padding_mask = (src[..., 0] == 0) & (src[..., 1] == 0)
+        # If i do self.transformer(src,src, src_key_padding_mask = src_padding_mask) works but not good results?
+        out = self.transformer(src,tgt, src_key_padding_mask = src_padding_mask)
+        out = self.fc(out[:,-1,:])
+        return out
+
+        
+        # src_mask = src_padding_mask.unsqueeze(1).unsqueeze(2)
+        # src_mask = src_mask.float().masked_fill(src_mask == 1, float('-inf')).masked_fill(src_mask == 0, float(0.0))
+
+        # # Repeat target tensor to match src tensor shape
+        # tgt_repeated = tgt.unsqueeze(1).repeat(1, src.size(1), 1)
+
+        # # Pass through transformer
+        # out = self.transformer(src, tgt_repeated, src_mask=src_mask, src_key_padding_mask=src_padding_mask)
+
+        # # Apply linear layer to the last output of the transformer
+        # out = self.fc(out[:, -1, :])
+        # return out
+
+
+
+# import torch
+# import torch.nn as nn
+# import math
+
+# class TransformerRegressor(nn.Module):
+
+#     def __init__(self, d_model,
+#                 nhead, num_encoder_layers,
+#                 num_decoder_layers,
+#                 dim_feedforward,
+#                 dropout,
+#                 batch_first = True) -> None:
+#         super().__init__()
+        
+#         self.name = 'Transformer'
+
+#         # base of the transformer
+#         self.transformer = nn.Transformer(d_model, nhead,
+#                                           num_encoder_layers,
+#                                           num_decoder_layers,
+#                                           dim_feedforward,
+#                                           dropout,
+#                                           batch_first=batch_first)
+#         # output layer to 1
+#         self.fc = nn.Linear(d_model, 1)
+
+#     def forward(self, src, tgt):
+#         # Generate masks
+#         src_padding_mask = (src[..., 0] == 0) & (src[..., 1] == 0)
+#         src_mask = src_padding_mask.unsqueeze(1).unsqueeze(2)
+#         src_mask = src_mask.float().masked_fill(src_mask == 1, float('-inf')).masked_fill(src_mask == 0, float(0.0))
+        
+#         # Permutation invariant: sum the source sequence along the time axis
+#         src = src.sum(dim=1)
+        
+#         # Repeat target tensor to match src tensor shape
+#         tgt_repeated = tgt.unsqueeze(1).repeat(1, src.size(1), 1)
+        
+#         # Pass through transformer
+#         out = self.transformer(src, tgt_repeated, src_mask=src_mask, src_key_padding_mask=src_padding_mask)
+        
+#         # Apply linear layer to the last output of the transformer
+#         out = self.fc(out[:, -1, :])
+#         return out
