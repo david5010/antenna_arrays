@@ -7,7 +7,7 @@ class TransformerRegressor(nn.Module):
                 num_decoder_layers,
                 dim_feedforward,
                 dropout,
-                input_dim=2,
+                input_dim=1024,
                 batch_first=True) -> None:
         super().__init__()
 
@@ -30,7 +30,7 @@ class TransformerRegressor(nn.Module):
         # Project input to d_model
         # src = self.input_proj(src)
         # # Generate masks
-        tgt = tgt.reshape(-1,1)
+        tgt = tgt.reshape(-1,1,1)
         # src = self.input_proj(src)
         tgt = self.target_proj(tgt)
         src_padding_mask = (src[..., 0] == 0) & (src[..., 1] == 0)
