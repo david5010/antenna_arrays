@@ -5,14 +5,27 @@ import torch
 import os
 
 class AntDataset(Dataset):
-    def __init__(self, data):
-        if data is not str:
+    def __init__(self, data, shuffle = False, seed = 123):
+        if not isinstance(data,str):
             self.data = data.astype(np.float32)
         elif os.path.splitext(data)[-1] == '.csv':
             self.data = pd.read_csv(data, header = None).values.astype(np.float32)
+        elif os.path.splitext(data)[-1] == '.npz':
+            self.data = np.load(data)['data'].astype(np.float32)
         else:
             self.data = np.load(data)['data'].astype(np.float32)
-            
+
+        self.shuffle = shuffle
+
+        if self.shuffle:
+            # Shuffle the antennas around
+            num_ant = (self.data.shape[1]-1)//2
+            index_order = np.random.RandomState(seed=seed).permutation(num_ant)
+            X, Y, label = self.data[:, :num_ant], self.data[:, num_ant:-1], self.data[:,-1].reshape(-1,1)
+            self.data = np.hstack((X[:, index_order], Y[:, index_order], label[:, -1].reshape(-1, 1)))
+
+
+
     def __len__(self):
         return len(self.data)
     
@@ -22,12 +35,20 @@ class AntDataset(Dataset):
         return torch.from_numpy(features), torch.from_numpy(np.array(label))
     
 class AntDataset2D(Dataset):
-    def __init__(self, data):
+    def __init__(self, data, shuffle = False, seed = 123):
+        np.random.seed(seed)
         if os.path.splitext(data)[-1] == '.csv':
             self.data = pd.read_csv(data, header= None).values.astype(np.float32)
         else:
             self.data = np.load(data)['data'].astype(np.float32)
         
+        self.shuffle = shuffle
+        if self.shuffle:
+            # Shuffle the antennas around
+            num_ant = (self.data.shape[1]-1)//2
+            index_order = np.random.RandomState(seed=seed).permutation(seed)
+            X, Y, label = self.data[:, :num_ant], self.data[:, num_ant:-1], self.data[:,-1].reshape(-1,1)
+            self.data = np.hstack((X[:, index_order], Y[:, index_order], label[:, -1].reshape(-1, 1)))
     def __len__(self):
         return len(self.data)
     
