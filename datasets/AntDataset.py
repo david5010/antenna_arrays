@@ -36,7 +36,6 @@ class AntDataset(Dataset):
     
 class AntDataset2D(Dataset):
     def __init__(self, data, shuffle = False, seed = 123):
-        np.random.seed(seed)
         if os.path.splitext(data)[-1] == '.csv':
             self.data = pd.read_csv(data, header= None).values.astype(np.float32)
         else:

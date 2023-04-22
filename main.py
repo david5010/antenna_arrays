@@ -55,14 +55,13 @@ def weight_reset(m):
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
         m.reset_parameters()
 
-def cross_validate(fold, model, optimizer, criterion, epochs, data, batch_size, seed, device):
+def cross_validate(fold, model, optimizer, criterion, epochs, data, batch_size, device):
 
     kf = KFold(n_splits = fold, shuffle = True)
     training_avg_loss = []
     testing_avg_loss = []
     for k, (train, test) in enumerate(kf.split(np.arange(len(data)))):
         print(f'{k}-Fold')
-        if seed: torch.manual_seed(100)
         train_loader = DataLoader(AntDataset(data[train]), batch_size=batch_size)
         test_loader = DataLoader(AntDataset(data[test]), batch_size=batch_size)
         new_fold = model
