@@ -13,10 +13,7 @@ def train(model, optimizer, criterion, train_loader, device):
     for i, (inputs, targets) in enumerate(train_loader):
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
-        if model.name == 'Transformer':
-            outputs = model(inputs, targets)
-        else:
-            outputs = model(inputs)
+        outputs = model(inputs)
         loss = criterion(outputs, targets.unsqueeze(1))
         loss.backward()
         optimizer.step()
@@ -31,10 +28,8 @@ def evaluate(model, criterion, test_loader, device):
     with torch.no_grad():
         for inputs, targets in test_loader:
             inputs, targets = inputs.to(device), targets.to(device)
-            if model.name == 'Transformer':
-                outputs = model(inputs, targets)
-            else:
-                outputs = model(inputs)
+            
+            outputs = model(inputs)
             loss = criterion(outputs, targets.unsqueeze(1))
             total_loss += loss.item()
 

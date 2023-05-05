@@ -38,7 +38,7 @@ class AntDataset2D(Dataset):
     def __init__(self, data, shuffle = False, seed = 123):
         if os.path.splitext(data)[-1] == '.csv':
             self.data = pd.read_csv(data, header= None).values.astype(np.float32)
-        else:
+        elif os.path.splitext(data)[-1] == '.npz':
             self.data = np.load(data)['data'].astype(np.float32)
         
         self.shuffle = shuffle
