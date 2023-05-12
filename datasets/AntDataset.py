@@ -45,7 +45,7 @@ class AntDataset2D(Dataset):
         if self.shuffle:
             # Shuffle the antennas around
             num_ant = (self.data.shape[1]-1)//2
-            index_order = np.random.RandomState(seed=seed).permutation(seed)
+            index_order = np.random.RandomState(seed=seed).permutation(num_ant)
             X, Y, label = self.data[:, :num_ant], self.data[:, num_ant:-1], self.data[:,-1].reshape(-1,1)
             self.data = np.hstack((X[:, index_order], Y[:, index_order], label[:, -1].reshape(-1, 1)))
     def __len__(self):
