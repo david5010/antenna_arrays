@@ -71,13 +71,21 @@ class ScaleYZCost:
         self.cost_scale = np.std(cost_data)
     
     def transform(self, y_data, z_data, cost_data):
+        scaled_y = np.zeros_like(y_data)
+        scaled_z = np.zeros_like(z_data)
+        scaled_cost = (cost_data - self.cost_mean) / self.cost_scale
         
-        scaled_y = (y_data - self.y_mean)/self.y_scale
-        scaled_z = (z_data - self.z_mean)/self.z_scale
-        scaled_cost = (cost_data - self.cost_mean)/self.cost_scale
-        scaled_cost = scaled_cost.reshape(-1,1)
-        combined = np.concatenate((scaled_y, scaled_z, scaled_cost), axis = 1)
+        y_mask = (y_data != 0)
+        z_mask = (z_data != 0)
+        
+        scaled_y[y_mask] = (y_data[y_mask] - self.y_mean) / self.y_scale
+        scaled_z[z_mask] = (z_data[z_mask] - self.z_mean) / self.z_scale
+        
+        scaled_cost = scaled_cost.reshape(-1, 1)
+        combined = np.concatenate((scaled_y, scaled_z, scaled_cost), axis=1)
+        
         return combined
+
 
     def inverse_transform(self, scaled_y, scaled_z, scaled_cost):
         y = (scaled_y * self.y_scale) + self.y_mean
