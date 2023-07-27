@@ -47,8 +47,11 @@ def gradient_wrt_input(model, ants, lr, noise_std, iters):
         with torch.no_grad():
             last = ants.clone()
             noise = torch.rand_like(ants) * noise_std
-            candidate = ants - (lr * ants.grad * (ants != 0).float())
+            ants -= (lr * ants.grad * (ants != 0).float())
             if calculate_min_distance(ants) < 0.5:
                 continue
         ants.grad.zero_()
     return ants
+
+def get_optimized_cost():
+    pass
