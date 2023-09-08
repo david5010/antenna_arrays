@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numba import jit
 
-# @jit(nopython = True)
-def analytic_uy_uz_mapping_quarter(AZ0_max,AZ0_min,EL0_max,EL0_min):
+@jit(nopython = True)
+def anaylitic_uy_uz_mapping_quarter(AZ0_max,AZ0_min,EL0_max,EL0_min):
     n = int(1e5)
     uz_SEC1_pos=np.ones(n)*(1+np.sin(np.deg2rad(np.abs(EL0_min))))
     AZ0=np.linspace(0,np.abs(AZ0_min),n)
@@ -19,8 +19,8 @@ def analytic_uy_uz_mapping_quarter(AZ0_max,AZ0_min,EL0_max,EL0_min):
     EL0_vec[1::2]=EL0_temp
     uy_SEC3_pos=np.sqrt(1-(uz_SEC3_pos-np.sin(np.deg2rad(EL0_vec)))**2)-np.cos(np.deg2rad(EL0_vec))*np.sin(np.deg2rad(AZ0_min))
 
-    uy_vec=np.concatenate((uy_SEC1_pos,uy_SEC2_pos,uy_SEC3_pos), axis=None)
-    uz_vec=np.concatenate((uz_SEC1_pos,uz_SEC2_pos,uz_SEC3_pos), axis=None)
+    uy_vec=np.concatenate((uy_SEC1_pos.astype(np.float64),uy_SEC2_pos.astype(np.float64),uy_SEC3_pos.astype(np.float64)), axis=None)
+    uz_vec=np.concatenate((uz_SEC1_pos.astype(np.float64),uz_SEC2_pos.astype(np.float64),uz_SEC3_pos.astype(np.float64)), axis=None)
 
     n = 500
     duz = np.max(uz_vec)/n
@@ -38,7 +38,7 @@ def analytic_uy_uz_mapping_quarter(AZ0_max,AZ0_min,EL0_max,EL0_min):
         uz_norm.extend(a)
         uy_norm.extend(np.ones(len(a))*duy*(i-1))
 
-    return np.array(uy_norm), np.array(uz_norm)
+    return uy_norm,uz_norm
 
 def InitializeParamsArray(ParamsArray = None):
     if ParamsArray is None:
@@ -61,7 +61,7 @@ def InitializeParamsArray(ParamsArray = None):
     ParamsArray["EL0_min"] = -10  # the minimum scan in elvation
     ParamsArray["AZ0_max"] = 20  # the maximum scan in azimuth
     ParamsArray["AZ0_min"] = -20  # the minimum scan in azimuth
-    uy_norm, uz_norm = analytic_uy_uz_mapping_quarter(ParamsArray["AZ0_max"], ParamsArray["AZ0_min"], ParamsArray["EL0_max"], ParamsArray["EL0_min"])
+    uy_norm, uz_norm = anaylitic_uy_uz_mapping_quarter(ParamsArray["AZ0_max"], ParamsArray["AZ0_min"], ParamsArray["EL0_max"], ParamsArray["EL0_min"])
     ParamsArray["uy"] = np.array(uy_norm) * ParamsArray["k"]
     ParamsArray["uz"] = np.array(uz_norm) * ParamsArray["k"]
     ParamsArray["PlotAF"] = False  # Flag option that provides the option for displaying the radiation pattern in uy-uz domain  (default false)
@@ -69,7 +69,7 @@ def InitializeParamsArray(ParamsArray = None):
     
     return ParamsArray
 
-# @jit(nopython = True)
+@jit(nopython = True)
 def CostFun(CostFunParams):
     lambda_ = CostFunParams['lambda']
     uy = CostFunParams['uy']
@@ -78,52 +78,39 @@ def CostFun(CostFunParams):
     Zant = CostFunParams['Zant']
     In = CostFunParams['In']
     p = CostFunParams['p']
-    k = 2 * np.pi / lambda_
-
-    AF = np.zeros(uy.shape, dtype=np.complex128)
 
     if In == 0:
-        for i in range(len(Yant)):
-            AF += np.exp(1j * (Yant[i] * uy + Zant[i] * uz))
+        AF = np.exp(1j * (Yant[:, np.newaxis] * uy + Zant[:, np.newaxis] * uz)).sum(axis=0)
     else:
-        for i in range(len(Yant)):
-            AF += In[i] * np.exp(1j * (Yant[i] * uy + Zant[i] * uz))
+        AF = (In * np.exp(1j * (Yant[:, np.newaxis] * uy + Zant[:, np.newaxis] * uz))).sum(axis=0)
 
+    k = 2 * np.pi / lambda_
     uy3dB = k * (lambda_ / max(Yant)) / 2 * 1.3
     uz3dB = k * (lambda_ / max(Zant)) / 2 * 1.3
 
-    idxuy = uy <= uy3dB
-    idxuz = uz <= uz3dB
-    idx = idxuy & idxuz
-
+    idx = (uy <= uy3dB) & (uz <= uz3dB)
     ML = AF[idx]
     RSLL = AF[~idx]
+
     GratingLobes = 20 * np.log10(np.abs(np.max(ML) / np.max(RSLL)))
-
     AF_p = np.power(np.abs(AF) ** 2, p)
-    nominator = np.sum(AF_p[idx])
-    dominator = np.sum(AF_p[~idx])
 
-    cost = - nominator / dominator
+    cost = - np.sum(AF_p[idx]) / np.sum(AF_p[~idx])
 
     return cost, GratingLobes
 
-# @jit(nopython = True)
+@jit(nopython = True)
 def AF_fun(xant_new, yant_new, ux_t, uy_t, I_np, AFlimit):
-    AF = np.zeros(ux_t.shape, dtype=np.complex128)
-
     if I_np == 0:
-        for i in range(len(xant_new)):
-            AF += np.exp(1j * (xant_new[i] * ux_t + yant_new[i] * uy_t))
-        AFdB = 20 * np.log10(np.abs(AF) / np.max(np.abs(AF)))
-        AFdB[AFdB - AFlimit < 0] = AFlimit
+        AF = np.exp(1j * (xant_new[:, np.newaxis] * ux_t + yant_new[:, np.newaxis] * uy_t)).sum(axis=0)
     else:
-        for i in range(len(xant_new)):
-            AF += I_np[i] * np.exp(1j * (xant_new[i] * ux_t + yant_new[i] * uy_t))
-        AFdB = 20 * np.log10(np.abs(AF) / np.nanmax(np.abs(AF)))
-        AFdB[AFdB - AFlimit < 0] = AFlimit
+        AF = (I_np * np.exp(1j * (xant_new[:, np.newaxis] * ux_t + yant_new[:, np.newaxis] * uy_t))).sum(axis=0)
+
+    AFdB = 20 * np.log10(np.abs(AF) / np.nanmax(np.abs(AF)))
+    AFdB[AFdB - AFlimit < 0] = AFlimit
 
     return AFdB
+
 
 
 def CostFunArray(Yant, Zant, ParamsArray):

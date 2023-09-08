@@ -53,5 +53,5 @@ def gradient_wrt_input(model, ants, lr, noise_std, iters):
         ants.grad.zero_()
     return ants
 
-def get_optimized_cost():
+def get_optimized_shape():
     pass
