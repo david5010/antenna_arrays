@@ -1,21 +1,52 @@
 import torch
 import matplotlib.pyplot as plt
+import numpy as np
+import os
+def save_figure(figure, title, directory='figures'):
+    # Ensure the directory exists
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        
+    figure_path = os.path.join(directory, f"{title}.png")
+    figure.savefig(figure_path)  # Save with reduced white space
+    plt.close(figure)  # Close the figure to free up memory
 
-def show_arrays(inp):
+def show_arrays(inp, title='Antenna Array Pattern', directory='figures'):
+    fig, ax = plt.subplots()  # Use subplots for better control over the figure
     data = inp.cpu().detach().numpy()
-    reshaped_data = np.reshape(data, (2,1024))
-    x = reshaped_data[0]
-    y = reshaped_data[1]
-
+    reshaped_data = np.reshape(data, (2, 1024))
+    x, y = reshaped_data
+    
     nonzero_ind = np.nonzero((x != 0) | (y != 0))
-    x = x[nonzero_ind]
-    y = y[nonzero_ind]
+    x, y = x[nonzero_ind], y[nonzero_ind]
+    
+    ax.scatter(x, y, s=0.75)
+    ax.set_xlabel('Y')
+    ax.set_ylabel('Z')
+    ax.set_title(title)
+    
+    save_figure(fig, title, directory)  # Pass the directory to save_figure
+# def save_figure(figure, title, directory):
+#     figure_path = os.path.join(directory, title + '.png')
+#     figure.savefig(figure_path)
+#     plt.close(figure)
+    
+# def show_arrays(inp, title = 'Antenna Array Pattern', dir = '/'):
+#     fig = plt.figure()
+#     data = inp.cpu().detach().numpy()
+#     reshaped_data = np.reshape(data, (2,1024))
+#     x = reshaped_data[0]
+#     y = reshaped_data[1]
 
-    plt.scatter(x,y, s=0.75)
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.title('Antenna Array Pattern')
-    plt.show()
+#     nonzero_ind = np.nonzero((x != 0) | (y != 0))
+#     x = x[nonzero_ind]
+#     y = y[nonzero_ind]
+
+#     plt.scatter(x,y, s=0.75)
+#     plt.xlabel('Y')
+#     plt.ylabel('Z')
+#     plt.title(title)
+#     save_figure(fig, title, dir)
 
 def calculate_min_distance(ants, unit = 1):
     """
@@ -34,24 +65,96 @@ def calculate_min_distance(ants, unit = 1):
     return smallest.item()
     
 
-def gradient_wrt_input(model, ants, lr, noise_std, iters):
-    model.eval()
-    last = None
-    for i in range(iters):
-        if ants.grad is not None:
-            ants.requires_grad_()
-            ants.grad.zero_()
-        output = model(ants)
-        output.backward()
+# def gradient_wrt_input(model, ants, lr, noise_std, iters):
+#     model.eval()
+#     last = None
+#     ants = ants.clone()
+#     ants.requires_grad_()
+#     for i in range(iters):
+#         if ants.grad is not None:
+#             ants.grad.zero_()
+#         output = model(ants)
+#         output.backward()
 
-        with torch.no_grad():
-            last = ants.clone()
-            noise = torch.rand_like(ants) * noise_std
-            ants -= (lr * ants.grad * (ants != 0).float())
-            if calculate_min_distance(ants) < 0.5:
-                continue
-        ants.grad.zero_()
-    return ants
+#         with torch.no_grad():
+#             last = ants.clone()
+#             noise = torch.rand_like(ants) * noise_std
+#             ants -= (lr * ants.grad * (ants != 0).float())
+#             if calculate_min_distance(ants) < 0.5:
+#                 print(f'Early Stop on {i}')
+#                 return last
+#     return ants
 
-def get_optimized_shape():
-    pass
+def reset_padding(tensor, padding_mask):
+    # tensor: the tensor to be adjusted
+    # padding_mask: a Boolean tensor of the same shape as tensor, where True indicates padding that should be reset to zero
+    with torch.no_grad():
+        tensor[padding_mask] = 0
+        
+def optimize_ants(model, ants_input, optimizer_class, iters, lr=0.001):
+    ants = ants_input.clone().detach().requires_grad_(True)  # Ensure ants is a clone and tracks gradients
+    padding_mask = (ants == 0)
+    opt = optimizer_class([ants], lr=lr)  # Initialize the optimizer correctly
+    
+    for it in range(iters):
+        last = ants.clone()
+        opt.zero_grad()
+        model_output = model(ants)
+        model_output.backward()  # Make sure the loss function is called correctly
+        opt.step()  # Call step on the correct optimizer instance
+        reset_padding(ants, padding_mask)  # Apply padding reset correctly
+        if calculate_min_distance(ants) < 0.5:
+            print(f'Early Stop at {it}')
+            return last
+    return ants  # Return the optimized tensor
+# def gradient_w_pen(model, ants, lr, eps = 1e-6, penalty = lambda x: 0, iters = 100):
+#     model.eval()
+#     last = None
+#     ants = ants.clone()
+#     ants.requires_grad_()
+#     for i in range(iters):
+#         if ants.grad is not None:
+#             ants.grad.zero_()
+#         output = model(ants)
+#         dist = calculate_min_distance(ants)
+#         cost = output + (eps * penalty(dist))
+#         cost.backward()
+
+#         with torch.no_grad():
+#             last = ants.clone()
+#             noise = torch.rand_like(ants)
+#             ants -= (lr * ants.grad * (ants != 0).float())
+#             if calculate_min_distance(ants) < 0.5:
+#                 print(f'Early Stop on {i}')
+#                 return last
+#     return ants
+
+def yz_split(tensor):
+    """
+    Splits a 1D tensor into two parts, yant and zant, each taking half of the tensor.
+    Then removes all trailing zeros from both parts.
+    
+    Args:
+    - tensor (torch.Tensor): A 1D tensor with 2048 elements.
+    
+    Returns:
+    - Tuple[torch.Tensor, torch.Tensor]: The two parts of the tensor with trailing zeros removed.
+    """    
+    # Split the tensor into yant and zant
+    yant, zant = tensor.split(1024)
+    
+    # Function to remove trailing zeros from a tensor
+    def remove_trailing_zeros(tensor):
+        # Find the indices of non-zero elements and get the maximum index
+        non_zero_indices = tensor.nonzero(as_tuple=True)[0]
+        if len(non_zero_indices) == 0:  # If tensor is all zeros
+            return tensor[:0]  # Return an empty tensor
+        else:
+            max_index = non_zero_indices.max()
+            return tensor[:max_index + 1]
+    
+    # Remove trailing zeros from yant and zant
+    yant = remove_trailing_zeros(yant)
+    zant = remove_trailing_zeros(zant)
+    
+    return yant, zant

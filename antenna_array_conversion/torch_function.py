@@ -117,10 +117,12 @@ def AF_fun(xant_new, yant_new, ux_t, uy_t, I_np, AFlimit, device):
         AF = torch.sum(I_np[:, None] * torch.exp(1j * (xant_new[:, None] * ux_t + yant_new[:, None] * uy_t)), dim=0)
         AFdB = 20 * torch.log10(torch.abs(AF) / torch.nanmax(torch.abs(AF)))
         AFdB[AFdB - AFlimit < 0] = AFlimit
+        
+    return AFdB
 
 def CostFunArray(Yant, Zant, ParamsArray, device):
-    Yant = Yant * ParamsArray['lambda']
-    Zant = Zant * ParamsArray['lambda']
+    Yant = Yant.to(device) * ParamsArray['lambda']
+    Zant = Zant.to(device) * ParamsArray['lambda']
 
     if ParamsArray['FlagTapering']:
         Iny = 0.54 + 0.46 * torch.cos(torch.pi / torch.max(Yant) * Yant)

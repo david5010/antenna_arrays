@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from numba import jit
+# from numba import jit
 
 # @jit(nopython = True)
 def analytic_uy_uz_mapping_quarter(AZ0_max,AZ0_min,EL0_max,EL0_min):
